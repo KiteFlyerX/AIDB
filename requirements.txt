@@ -1,0 +1,10 @@
+# STM32_TokenBase M1 依赖
+# 核心解析:tree-sitter + C grammar(主前端)
+tree-sitter>=0.25.0
+tree-sitter-c>=0.24.0
+
+# Lens 骨架渲染(Aider repomap 同款,可选增强)
+grep_ast>=0.9.0
+
+# Token 估算(M1 用于证明省 token;失败时回退到字符数/4 粗估)
+tiktoken>=0.7.0

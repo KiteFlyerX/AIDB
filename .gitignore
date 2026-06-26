@@ -21,10 +21,8 @@ env/
 .DS_Store
 Thumbs.db
 
-# AIDB 运行产物(本地生成的索引库,不入库)
-.aidb/
+# 运行产物(本地生成的索引库,不入库)
 *.db
-*.aidb
 logs/
 *.log
 
@@ -32,3 +30,6 @@ logs/
 config/local.yaml
 *.local.yaml
 .env
+
+# STM32_TokenBase 索引库(随工程走,不入库)
+.tokenbase/

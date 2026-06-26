@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stm32-tokenbase"
+version = "0.1.0"
+description = "STM32_TokenBase — AI-first 代码数据库(M1 里程碑:解析 C → SQLite → 带 Lens 的符号查询)"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "KiteFlyerX" }]
+requires-python = ">=3.10"
+dependencies = [
+    "tree-sitter>=0.25.0",
+    "tree-sitter-c>=0.24.0",
+    "grep_ast>=0.9.0",
+    "tiktoken>=0.7.0",
+]
+
+[project.scripts]
+tokenbase = "tokenbase.cli:main"
+
+[tool.setuptools]
+packages = ["tokenbase"]
