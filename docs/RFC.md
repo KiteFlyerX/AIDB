@@ -1,4 +1,4 @@
-# AIDB — AI-First Database
+# STM32_TokenBase — AI-First Database
 
 ### 一份设计白皮书 / RFC
 
@@ -18,9 +18,9 @@
 
 大模型改变了这个假设。当数据库的消费者变成 **AI(以 token 为食、有上下文窗口上限、会幻觉、需要可追溯证据)**,优化目标随之彻底改变:**从「查询效率」转向「token 经济学」——在固定 token 预算内,向 AI 传递最高密度的相关信息。**
 
-**AIDB** 是为这一新假设设计的数据库范式。本文定义其四个第一性抽象(**Atom / Lens / Intent Query / Token Budget**)、两个增强(**Provenance / Diff Stream**)、查询协议、数据模型、分层架构与落地路径。
+**STM32_TokenBase** 是为这一新假设设计的数据库范式。本文定义其四个第一性抽象(**Atom / Lens / Intent Query / Token Budget**)、两个增强(**Provenance / Diff Stream**)、查询协议、数据模型、分层架构与落地路径。
 
-> 核心主张:**范式是新的,引擎可复用**。AIDB 的创新在「抽象层与查询协议」,不必重写存储引擎;但为极致 token 效率,可为 Atom 设计专用序列化格式。
+> 核心主张:**范式是新的,引擎可复用**。STM32_TokenBase 的创新在「抽象层与查询协议」,不必重写存储引擎;但为极致 token 效率,可为 Atom 设计专用序列化格式。
 
 ---
 
@@ -32,13 +32,13 @@
 - 每次把无关代码喂给模型 = 烧钱(token)+ 稀释注意力;
 - 模型需要的是「**与当前问题相关的、带定位的、密度最高的片段**」,而非整库。
 
-现有方案(向量库 / 全文检索 / SCIP 索引)各自解决一部分,但都是**为人或为单一检索模式**设计的组件,**没有一个把「AI 作为读者」作为第一性原则**。AIDB 填补这一空白。
+现有方案(向量库 / 全文检索 / SCIP 索引)各自解决一部分,但都是**为人或为单一检索模式**设计的组件,**没有一个把「AI 作为读者」作为第一性原则**。STM32_TokenBase 填补这一空白。
 
 ---
 
 ## 2. 核心论点:AI 改变了「读者」假设
 
-| 维度 | 传统 DB(为人) | AIDB(为 AI) |
+| 维度 | 传统 DB(为人) | STM32_TokenBase(为 AI) |
 | --- | --- | --- |
 | 优化目标 | 存储成本、查询延迟 | **token 经济学**(信息密度/token) |
 | 基本单元 | 行 / 文档 / KV | **语义原子**(Atom) |
@@ -54,9 +54,9 @@
 
 ## 3. 范式定义
 
-> **AIDB 是一种以「语义原子」为基本单元、以「token 预算」为一等约束、以「意图查询」为接口、以「prompt-ready 包」为输出的数据库范式。**
+> **STM32_TokenBase 是一种以「语义原子」为基本单元、以「token 预算」为一等约束、以「意图查询」为接口、以「prompt-ready 包」为输出的数据库范式。**
 
-它不是某一种存储引擎,而是一组**抽象 + 协议**。任何实现这套抽象的系统都是 AIDB 实例。
+它不是某一种存储引擎,而是一组**抽象 + 协议**。任何实现这套抽象的系统都是 STM32_TokenBase 实例。
 
 ---
 
@@ -93,11 +93,11 @@ Atom 不是行,而是一个**自洽的语义实体**:一个函数、一个类型
 | `callgraph` | 调用/被调/引用 | ~50 | 关系定位 |
 | `config` | 关联配置(.ioc/寄存器) | ~30 | 外设诊断 |
 
-> 这是「渐进式披露(progressive disclosure)」的原生化:传统库要 AI 自己决定读多少,AIDB 把分辨率做成一等维度。
+> 这是「渐进式披露(progressive disclosure)」的原生化:传统库要 AI 自己决定读多少,STM32_TokenBase 把分辨率做成一等维度。
 
 ### 4.3 Intent Query(意图查询)—— 声明式,内置规划
 
-AI 不写 `SELECT`,而是声明**意图**,AIDB 内部自动规划多跳检索并综合:
+AI 不写 `SELECT`,而是声明**意图**,STM32_TokenBase 内部自动规划多跳检索并综合:
 
 ```
 POST /query
@@ -116,7 +116,7 @@ DB 内部规划(示例):`uart_init 原子 → 取 signature+config → 找调用
 
 ### 4.4 Token Budget(预算契约)—— 一等约束
 
-每次查询携带 token 预算,AIDB **在预算内最大化信息增益**。这是传统 DB 完全没有的维度。
+每次查询携带 token 预算,STM32_TokenBase **在预算内最大化信息增益**。这是传统 DB 完全没有的维度。
 
 **调度算法(贪心背包变体):**
 1. 多路召回候选 Atom × Lens 组合,每个标注 `(gain, cost_tokens)`;
@@ -132,7 +132,7 @@ DB 内部规划(示例):`uart_init 原子 → 取 signature+config → 找调用
 
 ### 4.6 增强:Diff Stream(变更流)
 
-AI 最常问「这次改了什么 / 上一轮为何失败」。AIDB 原生维护版本与变更:查询可带 `since=<version>`,只返回变更的 Atom。闭环调试天然受益。
+AI 最常问「这次改了什么 / 上一轮为何失败」。STM32_TokenBase 原生维护版本与变更:查询可带 `since=<version>`,只返回变更的 Atom。闭环调试天然受益。
 
 ---
 
@@ -184,7 +184,7 @@ atom://stm32/uart_send#body@v3
 
 ## 6. 数据模型与索引
 
-- **存储**:**SQLite**(单文件 `.aidb/index.db`,随工程走、零服务)。
+- **存储**:**SQLite**(单文件 `.tokenbase/index.db`,随工程走、零服务)。
   - 表:`atoms(uri, kind, provenance, version, embed_blob)`、`lenses(uri, lens, content, tokens)`、`edges(src, rel, dst)`(调用/引用图)、`meta(key, val)`。
 - **符号解析**:`ctags`(MVP,快)→ `libclang`(精确,理解宏/类型)。
 - **语义索引**:`SCIP/LSIF` 作为可选高质量前端。
@@ -194,7 +194,7 @@ atom://stm32/uart_send#body@v3
 
 ## 7. Token 经济学(核心指标)
 
-AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
+STM32_TokenBase 引入专属度量,替代传统 DB 的 QPS/延迟:
 
 | 指标 | 定义 |
 | --- | --- |
@@ -213,7 +213,7 @@ AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
 | --- | --- | --- |
 | **L3 范式层** | ✅ 全新(核心 IP) | Atom / Lens / Intent / Budget 抽象 |
 | **L2 协议层** | ✅ 新 | 查询协议、prompt-ready 序列化、MCP 暴露 |
-| **L1 实现层** | 🔁 可复用 | SQLite / 图索引 / 向量;日后可换专用 `.aidb` 格式 |
+| **L1 实现层** | 🔁 可复用 | SQLite / 图索引 / 向量;日后可换专用 `.tokenbase` 格式 |
 | **L0 引擎层** | 🔁 复用 | 除非追求学术级创新,后置 |
 
 **结论**:把创新投入 L3/L2;L1/L0 站在巨人肩膀。日后为极致 token 效率,可为 Atom 设计专用二进制序列化(这是可选的真创新点)。
@@ -228,7 +228,7 @@ AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
 | **M1** | Atom + Lens + 寻址;ctags 解析 C → SQLite;**符号精确查询**(无向量) | 给定符号返回带定位的 Lens,token 显著低于喂全文 |
 | **M2** | **Intent 规划器(规则版)+ Token Budget 调度器** | 预算约束下召回质量达标 |
 | **M3** | 向量召回 + Provenance + Diff Stream | 多路召回融合,幻觉关联率下降 |
-| **M4** | **MCP server** 暴露;独立孵化评估;`.aidb` 格式调研 | Claude/Codex/Cursor 共用一份索引 |
+| **M4** | **MCP server** 暴露;独立孵化评估;`.tokenbase` 格式调研 | Claude/Codex/Cursor 共用一份索引 |
 
 ---
 
@@ -241,38 +241,38 @@ AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
 
 ---
 
-## 11. 开放问题
+## 11. 决策记录(原开放问题,已定)
 
-1. **命名**:AIDB 是否最终定名?(备选:TokenBase / SemanticStore)
-2. **Atom 粒度**:函数级为默认;是否支持语句级 / 可配置?
-3. **Intent 规划**:规则优先 vs LLM 辅助,何时引入后者?
-4. **增量触发**:文件保存触发 / 定时 / 手动?
-5. **跨语言**:C/嵌入式先行,Python/Rust 何时支持?
-6. **是否独立 repo**:作为 EmbeddedAiCoder 子模块,还是独立孵化?
+1. **命名** ✅:**STM32_TokenBase**(先以 STM32 为案例验证可靠性;验证通过后再考虑去前缀通用化)。
+2. **Atom 粒度** ✅:**函数级为默认**,类型/宏/全局变量同为 Atom;后续可配置更细粒度。
+3. **Intent 规划** ✅:**M2 规则版图遍历优先**(可解释、零额外 token 成本);LLM 辅助规划留 M3+,仅用于模糊意图。
+4. **增量触发** ✅:**文件保存自动触发**(watchman / inotify / Qt QFileSystemWatcher)。
+5. **跨语言** ✅:**STM32(C)先行验证**;Python/Rust 待验证可靠后再扩。
+6. **是否独立 repo** ✅:**独立孵化**(已拆为独立仓库,与 EmbeddedAiCoder 平级)。
 
 ---
 
 ## 12. 相关工作
 
-经对 GitHub 同类项目的深读调研,现有方案分四类,均与 AIDB **互补而非替代**:
+经对 GitHub 同类项目的深读调研,现有方案分四类,均与 STM32_TokenBase **互补而非替代**:
 
 ### 12.1 语义/向量索引(code-as-document RAG)
-- **CocoIndex / cocoindex-code**([github.com/cocoindex-io](https://github.com/cocoindex-io/cocoindex-code)):Rust 增量引擎 + tree-sitter 切块 + embedding,嵌入式 SQLite。**通用 RAG pipeline,缺 Atom/Lens/Intent/Budget 全部范式**,且依赖 Rust + ~1GB torch,与桌面工具「单文件 SQLite + 零服务」约束冲突。AIDB 仅借鉴其增量与存储**形态**,不依赖其代码。
+- **CocoIndex / cocoindex-code**([github.com/cocoindex-io](https://github.com/cocoindex-io/cocoindex-code)):Rust 增量引擎 + tree-sitter 切块 + embedding,嵌入式 SQLite。**通用 RAG pipeline,缺 Atom/Lens/Intent/Budget 全部范式**,且依赖 Rust + ~1GB torch,与桌面工具「单文件 SQLite + 零服务」约束冲突。STM32_TokenBase 仅借鉴其增量与存储**形态**,不依赖其代码。
 
 ### 12.2 代码图 / 代码智能
-- **SCIP / LSIF**([sourcegraph/scip](https://github.com/sourcegraph/scip)):编译器级精确符号图(定义/引用/类型/宏),protobuf 产物。**AIDB 直接以其数据模型(Symbol URI / Occurrence / role 位)作为 Atom 存储蓝本**。C/C++ indexer `scip-clang` 为 Beta 且**无 Windows 原生二进制**,故 M1 不采用其为前端,但 schema 对齐以便 M2 可插拔。
+- **SCIP / LSIF**([sourcegraph/scip](https://github.com/sourcegraph/scip)):编译器级精确符号图(定义/引用/类型/宏),protobuf 产物。**STM32_TokenBase 直接以其数据模型(Symbol URI / Occurrence / role 位)作为 Atom 存储蓝本**。C/C++ indexer `scip-clang` 为 Beta 且**无 Windows 原生二进制**,故 M1 不采用其为前端,但 schema 对齐以便 M2 可插拔。
 - **Meta Glean**:大规模代码图索引(2021 开源),clang-based,自有 schema。
 
-### 12.3 Token-aware 代码地图(最接近 AIDB 理念)
-- **Aider repo map**([github.com/Aider-AI/aider](https://github.com/Aider-AI/aider)):tree-sitter 提符号 + **Personalized PageRank** 排序 + token 预算内压缩成静态地图。**AIDB 直接复用其符号提取 query、PageRank 边权公式、TreeContext 渲染**作为 M1 地基;差异在于 Aider 是「预处理生成静态地图喂 LLM」,AIDB 是「查询时按 Intent 动态调度多分辨率 Lens」。
+### 12.3 Token-aware 代码地图(最接近 STM32_TokenBase 理念)
+- **Aider repo map**([github.com/Aider-AI/aider](https://github.com/Aider-AI/aider)):tree-sitter 提符号 + **Personalized PageRank** 排序 + token 预算内压缩成静态地图。**STM32_TokenBase 直接复用其符号提取 query、PageRank 边权公式、TreeContext 渲染**作为 M1 地基;差异在于 Aider 是「预处理生成静态地图喂 LLM」,STM32_TokenBase 是「查询时按 Intent 动态调度多分辨率 Lens」。
 
 ### 12.4 其他
-- **GraphRAG**:图 + 向量混合检索,AIDB 多路召回受其启发。
+- **GraphRAG**:图 + 向量混合检索,STM32_TokenBase 多路召回受其启发。
 - **向量库**(Chroma / Qdrant / FAISS / sqlite-vec):L1 实现选项,M1 不启用。
-- **MCP(Model Context Protocol)**:AIDB 的 L2 协议经 MCP 暴露,服务 Claude / Codex / Cursor 等。
-- **LSP**:面向 IDE / 人;AIDB 面向 AI,读者不同。
+- **MCP(Model Context Protocol)**:STM32_TokenBase 的 L2 协议经 MCP 暴露,服务 Claude / Codex / Cursor 等。
+- **LSP**:面向 IDE / 人;STM32_TokenBase 面向 AI,读者不同。
 
-> **调研结论**:基础能力(embedding / tree-sitter / SCIP / repo-map)均已被解决,AIDB 不重造,作为 L1 复用;AIDB 的贡献集中在 L3/L2 范式与协议层(token budget + intent + 多分辨率)。详细复用/自研清单见附录 A。
+> **调研结论**:基础能力(embedding / tree-sitter / SCIP / repo-map)均已被解决,STM32_TokenBase 不重造,作为 L1 复用;STM32_TokenBase 的贡献集中在 L3/L2 范式与协议层(token budget + intent + 多分辨率)。详细复用/自研清单见附录 A。
 
 ---
 
@@ -280,7 +280,7 @@ AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
 
 - **短期**:作为 EmbeddedAiCoder 的上下文引擎,支撑 F-07(源码上下文检索)与 F-23(知识库),直接降低 AI 改码的 token 成本。
 - **中期**:封装为 **MCP server**,让 Claude Opus / Codex / Claude Code **共用一份索引**。
-- **长期**:AIDB 的价值**可能大于** EmbeddedAiCoder 本身,具备独立开源与标准化(`.aidb` 格式)的潜力,届时拆分为独立仓库与项目。
+- **长期**:STM32_TokenBase 的价值**可能大于** EmbeddedAiCoder 本身,具备独立开源与标准化(`.tokenbase` 格式)的潜力,届时拆分为独立仓库与项目。
 
 ---
 
@@ -306,7 +306,7 @@ AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
 
 ### A.3 必须自研(三者皆无)
 
-1. **C 的 reference query** —— Aider 的 C query 仅抓 def,靠 Pygments 兜底(无行号、有噪声);AIDB 须自写 `c-refs.scm`。
+1. **C 的 reference query** —— Aider 的 C query 仅抓 def,靠 Pygments 兜底(无行号、有噪声);STM32_TokenBase 须自写 `c-refs.scm`。
 2. **`atom://` URI 体系**(对齐 SCIP 文法)+ 稳定身份。
 3. **Lens 多分辨率**(概览/签名/全文/调用图 四档)。
 4. **Intent Query 多跳规划器**。
