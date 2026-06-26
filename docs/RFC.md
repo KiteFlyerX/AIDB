@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 状态 | Draft v0.1(征求意见) |
+| 状态 | Draft v0.2(加入 M1 选型与复用决策) |
 | 日期 | 2026-06-26 |
 | 作者 | KiteFlyerX / EmbeddedAiCoder Project |
 | 许可 | 随仓库 GPLv3 |
@@ -254,11 +254,25 @@ AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
 
 ## 12. 相关工作
 
-- **SCIP / LSIF**(Sourcegraph):代码语义索引的工业标准,AIDB 的 Atom/Lens 与之理念相通,但 AIDB 进一步引入 token 预算与意图查询。
-- **GraphRAG**:图 + 向量混合检索;AIDB 的多路召回受其启发。
-- **向量库**(Chroma / Qdrant / FAISS / sqlite-vec):作为 L1 实现选项。
-- **MCP(Model Context Protocol)**:AIDB 的 L2 协议可经 MCP 暴露,服务多 AI 客户端。
-- **LSP**:面向 IDE/人;AIDB 面向 AI,目标读者不同。
+经对 GitHub 同类项目的深读调研,现有方案分四类,均与 AIDB **互补而非替代**:
+
+### 12.1 语义/向量索引(code-as-document RAG)
+- **CocoIndex / cocoindex-code**([github.com/cocoindex-io](https://github.com/cocoindex-io/cocoindex-code)):Rust 增量引擎 + tree-sitter 切块 + embedding,嵌入式 SQLite。**通用 RAG pipeline,缺 Atom/Lens/Intent/Budget 全部范式**,且依赖 Rust + ~1GB torch,与桌面工具「单文件 SQLite + 零服务」约束冲突。AIDB 仅借鉴其增量与存储**形态**,不依赖其代码。
+
+### 12.2 代码图 / 代码智能
+- **SCIP / LSIF**([sourcegraph/scip](https://github.com/sourcegraph/scip)):编译器级精确符号图(定义/引用/类型/宏),protobuf 产物。**AIDB 直接以其数据模型(Symbol URI / Occurrence / role 位)作为 Atom 存储蓝本**。C/C++ indexer `scip-clang` 为 Beta 且**无 Windows 原生二进制**,故 M1 不采用其为前端,但 schema 对齐以便 M2 可插拔。
+- **Meta Glean**:大规模代码图索引(2021 开源),clang-based,自有 schema。
+
+### 12.3 Token-aware 代码地图(最接近 AIDB 理念)
+- **Aider repo map**([github.com/Aider-AI/aider](https://github.com/Aider-AI/aider)):tree-sitter 提符号 + **Personalized PageRank** 排序 + token 预算内压缩成静态地图。**AIDB 直接复用其符号提取 query、PageRank 边权公式、TreeContext 渲染**作为 M1 地基;差异在于 Aider 是「预处理生成静态地图喂 LLM」,AIDB 是「查询时按 Intent 动态调度多分辨率 Lens」。
+
+### 12.4 其他
+- **GraphRAG**:图 + 向量混合检索,AIDB 多路召回受其启发。
+- **向量库**(Chroma / Qdrant / FAISS / sqlite-vec):L1 实现选项,M1 不启用。
+- **MCP(Model Context Protocol)**:AIDB 的 L2 协议经 MCP 暴露,服务 Claude / Codex / Cursor 等。
+- **LSP**:面向 IDE / 人;AIDB 面向 AI,读者不同。
+
+> **调研结论**:基础能力(embedding / tree-sitter / SCIP / repo-map)均已被解决,AIDB 不重造,作为 L1 复用;AIDB 的贡献集中在 L3/L2 范式与协议层(token budget + intent + 多分辨率)。详细复用/自研清单见附录 A。
 
 ---
 
@@ -267,6 +281,43 @@ AIDB 引入专属度量,替代传统 DB 的 QPS/延迟:
 - **短期**:作为 EmbeddedAiCoder 的上下文引擎,支撑 F-07(源码上下文检索)与 F-23(知识库),直接降低 AI 改码的 token 成本。
 - **中期**:封装为 **MCP server**,让 Claude Opus / Codex / Claude Code **共用一份索引**。
 - **长期**:AIDB 的价值**可能大于** EmbeddedAiCoder 本身,具备独立开源与标准化(`.aidb` 格式)的潜力,届时拆分为独立仓库与项目。
+
+---
+
+---
+
+## 附录 A:M1 选型与复用决策
+
+> 基于对 Aider repo map、SCIP/scip-clang、CocoIndex 的深读调研得出。
+
+### A.1 选型(核心一句话)
+**自建轻量 Python;ctags + tree-sitter 双前端;Atom schema 对齐 SCIP;首版无向量。**
+
+### A.2 直接复用
+
+| 复用项 | 来源 | 用法 |
+| --- | --- | --- |
+| C 的 tree-sitter def query | Aider `c-tags.scm` | 提取 Atom 定义 |
+| Personalized PageRank + 边权公式 | Aider `get_ranked_tags`(`√引用 × 命名风格 × 上下文`) | Atom 重要性排序起点 |
+| TreeContext 层级渲染 | Aider / grep_ast | 实现 Lens「签名」档 |
+| 二分 token 收敛 + 行采样估算 | Aider | 单 Lens 内裁剪 |
+| SCIP 数据模型(Symbol URI / Occurrence / role 位) | `scip.proto` | Atom 存储设计蓝本 |
+| 增量哈希缓存 + 嵌入式 SQLite + MCP 单 tool | CocoIndex | 形态借鉴,代码自写(~50 行) |
+
+### A.3 必须自研(三者皆无)
+
+1. **C 的 reference query** —— Aider 的 C query 仅抓 def,靠 Pygments 兜底(无行号、有噪声);AIDB 须自写 `c-refs.scm`。
+2. **`atom://` URI 体系**(对齐 SCIP 文法)+ 稳定身份。
+3. **Lens 多分辨率**(概览/签名/全文/调用图 四档)。
+4. **Intent Query 多跳规划器**。
+5. **Token Budget 调度**(per-Query,在 Lens 间分配以最大化信息增益)。
+6. **Prompt-ready 序列化** + SQLite importer / 查询层。
+
+### A.4 关键架构决策
+
+- **双前端、schema 对齐 SCIP、存储前端无关**:Atom 表设计为 `(atom_uri, kind, file, line, role)`,ctags 与未来 SCIP 灌入皆同 → M1 用 ctags/tree-sitter 不阻塞,M2 加 scip-clang(高精度,Linux/WSL)为纯增量。
+- **M1 不用 scip-clang**:无 Windows 原生二进制 + 需 compile_commands + Beta;而 STM32 主战场在 Windows,此为决定性因素。
+- **不依赖 CocoIndex**:拖 Rust 引擎 + ~1GB torch,与「单文件 SQLite + 零服务 + 嵌入桌面应用」硬冲突。
 
 ---
 
