@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AIDB 运行产物(本地生成的索引库,不入库)
+.aidb/
+*.db
+*.aidb
+logs/
+*.log
+
+# 本地配置/密钥
+config/local.yaml
+*.local.yaml
+.env
